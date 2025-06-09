@@ -1,74 +1,106 @@
 import express, { Response } from 'express';
-import {
-  TypedRequestBody,
-  TypedRequestParams,
-  TypedRequestParamsBody,
-  TypedRequestQuery,
-} from './types';
 import { db } from './db';
 import { HttpStatus } from './constants/statuses';
-import { ViewCourseModel } from './models/courses/ViewCourseModel';
-import { QueryInputModel } from './models/courses/QueryInputModel';
-import { CreateInputModel } from './models/courses/CreateInputModel';
-import { UpdateInputModel } from './models/courses/UpdateInputModel';
-import { URIParamsCourseModel } from './models/courses/URIParamsCourseModel';
+import { PATH } from './constants/routes';
+import { Video } from './types/videos';
+import { TypedRequestBody, TypedRequestParams, TypedRequestParamsBody } from './types';
+import { URIParamsVideoModel } from './models/videos/URIParamsCourseModel';
+import { CreateInputModel } from './models/videos/CreateInputModel';
+import { VALID_RESOLUTIONS } from './constants/video';
+import { APIErrorResult } from './types/error';
+import { UpdateVideoInputModel } from './models/videos/UpdateVideoInputModel';
 
-import { getViewCourseModel } from './utils';
-
-const port = 3000;
+const port = 3003;
 
 const app = express();
 
 app.use(express.json()); // Чтобы Express понимал JSON в теле запроса
 
-app.get('/courses', (req: TypedRequestQuery<QueryInputModel>, res: Response<ViewCourseModel[]>) => {
-  const queryTitle = req.query.title || '';
-  const filteredCourses = db.courses.filter((c) => c.title.includes(queryTitle));
-
-  const mappedCourses: ViewCourseModel[] = filteredCourses.map(getViewCourseModel);
-  res.send(mappedCourses);
+app.get(PATH.BASE.ROOT, (req, res: Response) => {
+  res.json('Hello!');
 });
 
-app.get(
-  '/courses/:id',
-  (req: TypedRequestParams<URIParamsCourseModel>, res: Response<ViewCourseModel>) => {
-    const foundCourse = db.courses.find((c) => c.id === +req.params.id);
-    if (!foundCourse) {
-      res.sendStatus(HttpStatus.NotFound_404);
-      return;
-    }
+app.get(PATH.VIDEOS.ROOT, (req, res: Response<Video[]>) => {
+  res.json(db.videos);
+});
 
-    const mappedCourse = getViewCourseModel(foundCourse);
-    res.json(mappedCourse);
-  }
-);
-
-app.post('/courses', (req: TypedRequestBody<CreateInputModel>, res: Response<ViewCourseModel>) => {
-  const bodyTitle = req.body.title?.toString();
-  if (!bodyTitle?.length) {
-    res.sendStatus(HttpStatus.BadRequest_400);
+app.get(PATH.VIDEOS.BY_ID, (req: TypedRequestParams<URIParamsVideoModel>, res: Response<Video>) => {
+  const foundVideo = db.videos.find((v) => v.id === +req.params.id);
+  if (!foundVideo) {
+    res.sendStatus(HttpStatus.NotFound_404);
     return;
   }
 
-  const newCourse = {
-    id: +new Date(),
-    title: bodyTitle,
-    studentsCount: 0,
-  };
-
-  db.courses.push(newCourse);
-
-  const mappedNewCourse = getViewCourseModel(newCourse);
-  res.status(HttpStatus.Created_201).json(mappedNewCourse);
+  res.json(foundVideo);
 });
 
-app.delete('/courses/:id', (req: TypedRequestParams<URIParamsCourseModel>, res: Response) => {
-  const courseId = +req.params.id;
-  const initialLength = db.courses.length;
+app.post(
+  PATH.VIDEOS.ROOT,
+  (req: TypedRequestBody<CreateInputModel>, res: Response<Video | APIErrorResult>) => {
+    const { title, author, availableResolutions } = req.body;
 
-  db.courses = db.courses.filter((c) => c.id !== courseId);
+    const errors: { message: string; field: string }[] = [];
 
-  if (db.courses.length === initialLength) {
+    if (!title || typeof title !== 'string' || title.trim().length === 0 || title.length > 40) {
+      errors.push({
+        message: 'Title is required and must not exceed 40 characters',
+        field: 'title',
+      });
+    }
+
+    if (!author || typeof author !== 'string' || author.trim().length === 0 || author.length > 20) {
+      errors.push({
+        message: 'Author is required and must not exceed 20 characters',
+        field: 'author',
+      });
+    }
+
+    if (
+      !Array.isArray(availableResolutions) ||
+      availableResolutions.length === 0 ||
+      !availableResolutions.every((res) => VALID_RESOLUTIONS.includes(res))
+    ) {
+      errors.push({
+        message: 'At least one valid resolution must be provided',
+        field: 'availableResolutions',
+      });
+    }
+
+    if (errors.length > 0) {
+      res.status(HttpStatus.BadRequest_400).json({ errorsMessages: errors });
+      return;
+    }
+
+    // TODO: add validation
+    if (!title?.length) {
+      res.sendStatus(HttpStatus.BadRequest_400);
+      return;
+    }
+
+    const newVideo = {
+      id: +new Date(),
+      title: title,
+      author: author,
+      canBeDownloaded: false,
+      minAgeRestriction: null,
+      createdAt: new Date().toISOString(),
+      publicationDate: new Date().toISOString(),
+      availableResolutions: availableResolutions,
+    };
+
+    db.videos.push(newVideo);
+
+    res.status(HttpStatus.Created_201).json(newVideo);
+  }
+);
+
+app.delete(PATH.VIDEOS.BY_ID, (req: TypedRequestParams<URIParamsVideoModel>, res: Response) => {
+  const videoId = +req.params.id;
+  const initialLength = db.videos.length;
+
+  db.videos = db.videos.filter((v) => v.id !== videoId);
+
+  if (db.videos.length === initialLength) {
     res.sendStatus(HttpStatus.NotFound_404);
     return;
   }
@@ -77,35 +109,107 @@ app.delete('/courses/:id', (req: TypedRequestParams<URIParamsCourseModel>, res: 
 });
 
 app.put(
-  '/courses/:id',
+  PATH.VIDEOS.BY_ID,
   (
-    req: TypedRequestParamsBody<URIParamsCourseModel, UpdateInputModel>,
-    res: Response<ViewCourseModel>
+    req: TypedRequestParamsBody<URIParamsVideoModel, UpdateVideoInputModel>,
+    res: Response<Video | APIErrorResult>
   ) => {
-    if (!req.body.title) {
-      res.sendStatus(400);
+    const {
+      title,
+      author,
+      availableResolutions,
+      canBeDownloaded,
+      minAgeRestriction,
+      publicationDate,
+    } = req.body;
+    const videoId = Number(req.params.id);
+
+    const errors: { message: string; field: string }[] = [];
+
+    // Валидация полей
+    if (!title || typeof title !== 'string' || title.trim().length === 0 || title.length > 40) {
+      errors.push({
+        message: 'Title is required and must not exceed 40 characters',
+        field: 'title',
+      });
+    }
+
+    if (!author || typeof author !== 'string' || author.trim().length === 0 || author.length > 20) {
+      errors.push({
+        message: 'Author is required and must not exceed 20 characters',
+        field: 'author',
+      });
+    }
+
+    if (
+      !Array.isArray(availableResolutions) ||
+      availableResolutions.length === 0 ||
+      !availableResolutions.every((res) => VALID_RESOLUTIONS.includes(res))
+    ) {
+      errors.push({
+        message: 'At least one valid resolution must be provided',
+        field: 'availableResolutions',
+      });
+    }
+
+    if (typeof canBeDownloaded !== 'boolean') {
+      errors.push({ message: 'canBeDownloaded must be boolean', field: 'canBeDownloaded' });
+    }
+
+    if (
+      minAgeRestriction !== null &&
+      (typeof minAgeRestriction !== 'number' || minAgeRestriction < 1 || minAgeRestriction > 18)
+    ) {
+      errors.push({
+        message: 'minAgeRestriction must be null or an integer between 1 and 18',
+        field: 'minAgeRestriction',
+      });
+    }
+
+    if (!publicationDate || isNaN(Date.parse(publicationDate))) {
+      errors.push({
+        message: 'publicationDate must be a valid date-time string',
+        field: 'publicationDate',
+      });
+    }
+
+    if (errors.length > 0) {
+      res.status(HttpStatus.BadRequest_400).json({ errorsMessages: errors });
       return;
     }
-    const foundCourse = db.courses.find((c) => c.id === +req.params.id);
-    if (!foundCourse) {
+
+    const videoIndex = db.videos.findIndex((v) => v.id === videoId);
+    if (videoIndex === -1) {
       res.sendStatus(HttpStatus.NotFound_404);
       return;
     }
-    foundCourse.title = req.body.title;
 
-    const mappedFoundCourse = getViewCourseModel(foundCourse);
+    const updatedVideo: Video = {
+      ...db.videos[videoIndex],
+      title: title.trim(),
+      author: author.trim(),
+      availableResolutions,
+      canBeDownloaded,
+      minAgeRestriction,
+      publicationDate,
+    };
 
-    res.status(HttpStatus.Ok_200).json(mappedFoundCourse);
+    db.videos[videoIndex] = updatedVideo;
+    res.status(HttpStatus.NoContent_204).send();
   }
 );
 
-app.delete('/__test__/db', (req, res: Response) => {
-  db.courses = [];
+app.delete('/testing/all-data', (req, res: Response) => {
+  db.videos = [];
   res.sendStatus(HttpStatus.NoContent_204);
 });
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
+app
+  .listen(port, () => {
+    console.log(`Listening on port ${port}`);
+  })
+  .on('error', (err) => {
+    console.error('Failed to start server:', err);
+  });
 
 export { app };

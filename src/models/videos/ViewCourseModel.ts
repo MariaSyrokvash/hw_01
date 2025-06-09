@@ -1,4 +1,3 @@
-export type ViewCourseModel = {
-  id: number;
-  title: string;
-};
+import { Video } from '../../types/videos';
+
+export type VideoViewModel = Video;

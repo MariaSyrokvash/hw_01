@@ -1,9 +1,9 @@
-import { Course } from '../types/courses';
-import { ViewCourseModel } from '../models/courses/ViewCourseModel';
+import { Video } from '../types/videos';
+import { VideoViewModel } from '../models/videos/ViewCourseModel';
 
-export const getViewCourseModel = (dbCourse: Course): ViewCourseModel =>  {
-  return {
-    id: dbCourse.id,
-    title: dbCourse.title,
-  }
-}
+// export const getViewCourseModel = (dbCourse: Video): VideoViewModel =>  {
+//   return {
+//     // id: dbCourse.id,
+//     // title: dbCourse.title,
+//   }
+// }

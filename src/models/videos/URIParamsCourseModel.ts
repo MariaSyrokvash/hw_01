@@ -1,6 +1,6 @@
-export type URIParamsCourseModel = {
+export type URIParamsVideoModel = {
   /**
-   * id existing course
+   * id existing video
    */
   id: string;
 };

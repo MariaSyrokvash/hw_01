@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { app } from '../src';
 import { HttpStatus } from '../src/constants/statuses';
-import { Course } from '../src/types/courses';
+import { Course } from '../src/types/videos';
 import { CreateInputModel } from '../src/models/courses/CreateInputModel';
 import { UpdateInputModel } from '../src/models/courses/UpdateInputModel';
 

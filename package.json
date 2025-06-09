@@ -1,4 +1,28 @@
 {
   "name": "hw01_videos",
-  "packageManager": "yarn@4.5.2"
+  "packageManager": "yarn@4.5.2",
+  "scripts": {
+    "watch": "tsc -w",
+    "dev": "nodemon ./dist/index.js",
+    "start": "concurrently -k -n TSC,DEV -c blue,green \"yarn watch\" \"yarn dev\"",
+    "format": "prettier --write .",
+    "jest": "jest"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "jest": "^29.7.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.15.30",
+    "@types/supertest": "^6.0.3",
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.5.3",
+    "supertest": "^7.1.1",
+    "ts-jest": "^29.3.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
 }
